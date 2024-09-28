@@ -1,3 +1,5 @@
+from .agent import generate_random_user_agent
+
 def headers(token=None):
     headers = {
         "Accept": "application/json, text/plain, */*",
@@ -11,8 +13,7 @@ def headers(token=None):
         "Sec-Fetch-Dest": "empty",
         "Sec-Fetch-Mode": "cors",
         "Sec-Fetch-Site": "same-origin",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-   
+        "User-Agent": generate_random_user_agent(),
     }
 
     if token:

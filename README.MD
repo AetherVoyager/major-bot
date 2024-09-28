@@ -13,6 +13,15 @@ To use this bot, you need to register it with the Major Telegram Bot.
 3. Install This Major Telegram Bot
 4. Have Fun 🦈
 
+## Update 2024/09/29
+
+
+- **user agent** : header uses a random but specific user agent can be seen in `src/agent.py`
+- **min & max game_delay** : make the game delay randomized for each existing game | see on `config.json`
+- **min & max request_delay** : the delay time for each request sent to the api | see on `config.json`
+- **retry mechanism** : is an attempt mechanism to re-request to the api when the previous request failed.
+- **????** : some minor improvements & log error | see on `last.log`
+
 ## Features
 
 - **Puzzle**: Semi-automatic Solve Durov Puzzle `NEW` add puzzle number to puzzle.txt separated with (,) coma eg: `8,1,14,11` its the " BOX NUMBER "

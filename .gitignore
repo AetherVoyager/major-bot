@@ -2,6 +2,8 @@
 *.json
 *.py
 !bot.py
+!agent.py
+!core.py
 *.html
 *.txt
 !data.txt

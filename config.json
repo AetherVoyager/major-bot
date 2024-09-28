@@ -2,8 +2,12 @@
   "use_proxies": false,
   "auto_complete_task": false,
   "auto_play_game": false,
+  "min_game_delay": 5,
+  "max_game_delay": 15,
   "account_delay": 5,
-  "game_delay": 3,
   "wait_time": 3600,
-  "data_file": "data.txt"
+
+  "data_file": "data.txt",
+  "min_request_delay": 1,
+  "max_request_delay": 3
 }
