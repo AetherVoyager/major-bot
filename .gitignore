@@ -1,7 +1,8 @@
 *.log
+!last.log
 *.json
 *.py
-!bot.py
+!main.py
 !agent.py
 !core.py
 *.html
