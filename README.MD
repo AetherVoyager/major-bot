@@ -4,6 +4,13 @@ A Python bot for interacting with the Major Telegram Bot API. This bot can perfo
 
 [TELEGRAM CHANNEL](https://t.me/Deeplchain) | [TWITTER](https://x.com/itsjaw_real)
 
+### This bot helpfull? Contributed by buying me a coffee: 
+```
+0x705C71fc031B378586695c8f888231e9d24381b4 - EVM
+TDTtTc4hSnK9ii1VDudZij8FVK2ZtwChja - TRON
+UQBy7ICXV6qFGeFTRWSpnMtoH6agYF3PRa5nufcTr3GVOPri - TON
+```
+
 ## Register
 
 To use this bot, you need to register it with the Major Telegram Bot. 
@@ -13,18 +20,18 @@ To use this bot, you need to register it with the Major Telegram Bot.
 3. Install This Major Telegram Bot
 4. Have Fun 🦈
 
-## Update 2024/09/29
+## Update 2024/09/29&30
 
-
+- **Downgrade** : back to using the previous version of the major
+- **Fix** : fix the bug that crash bot when check-in holding, spinning & retrieving user information.
+- **Adding** : speed up task checking by skipping tasks that need to be verified.
+- **Adding** : add a new configurations time delay and points amount on `config.json` 
+- **Fix** : fix the bug that caused the bot to crash when 
 - **user agent** : header uses a random but specific user agent can be seen in `src/agent.py`
-- **min & max game_delay** : make the game delay randomized for each existing game | see on `config.json`
-- **min & max request_delay** : the delay time for each request sent to the api | see on `config.json`
-- **retry mechanism** : is an attempt mechanism to re-request to the api when the previous request failed.
-- **????** : some minor improvements & log error | see on `last.log`
 
 ## Features
 
-- **Puzzle**: Semi-automatic Solve Durov Puzzle `NEW` add puzzle number to puzzle.txt separated with (,) coma eg: `8,1,14,11` its the " BOX NUMBER "
+- **Puzzle**: Semi-automatic Solve Durov Puzzle `NEW` add puzzle number its the " BOX NUMBER " to puzzle.txt separated with (,) coma eg: `8,1,14,11`
 - **Check In**: Automatically check in and increase the visit count.
 - **Task Management**: Retrieve and complete daily tasks.
 - **Coin Holding**: Play the hold coin game with a random amount.
@@ -34,7 +41,7 @@ To use this bot, you need to register it with the Major Telegram Bot.
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.10+
 
 ## Installation
 
@@ -71,14 +78,22 @@ To use this bot, you need to register it with the Major Telegram Bot.
 
     ```json
     {
-    "use_proxies": true,
-    "auto_complete_task": true,
-    "auto_play_game": true,
+    "use_proxy": false,
+    "auto_complete_task": false,
+    "auto_play_game": false,
+
+    "min_point_holdcoin": 800,
+    "max_point_holdcoin": 915,
+    "min_point_swipecoin": 1000,
+    "max_point_swipecoin": 2300,
+
+    "min_game_delay": 5,
+    "max_game_delay": 15,
     "account_delay": 5,
-    "game_delay": 3,
     "wait_time": 3600,
     "data_file": "data.txt"
     }
+
 
     ```
 
