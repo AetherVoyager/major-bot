@@ -7,87 +7,67 @@ import json
 from colorama import init
 from datetime import datetime
 from src.headers import headers
-from typing import Optional, Dict, Any, Union
 from src.auth import get_token
-from src.utils import log, log_error, log_line, countdown_timer, _banner, _clear, mrh, hju, kng, pth, bru, htm, reset
+from src.utils import log,log_error, log_line, countdown_timer, _banner, _clear, mrh, hju, kng, pth, bru, htm, reset
 
 init(autoreset=True)
 
-from typing import Optional, Dict, List
-
 class Major:
-    def __init__(self, config_file: str = 'config.json'):
+    def __init__(self, config_file='config.json'):
         with open(config_file, 'r') as f:
             config = json.load(f)
-        
-        self.auto_do_task: bool = config.get('auto_complete_task', False)
-        self.auto_play_game: bool = config.get('auto_play_game', False)
-        self.wait_time: int = config.get('wait_time', 3600)
-        self.account_delay: int = config.get('account_delay', 5)
-        self.min_game_delay: int = config.get('min_game_delay', 5)
-        self.max_game_delay: int = config.get('max_game_delay', 10)
-        self.data_file: str = config.get('data_file', 'data.txt')
-        self.min_delay: float = config.get('min_request_delay', 1.0)
-        self.max_delay: float = config.get('max_request_delay', 3.0)
-        self.proxies: List[Dict[str, str]] = self.load_proxies('proxies.txt')
+        self.auto_do_task = config.get('auto_complete_task', False)
+        self.auto_play_game = config.get('auto_play_game', False)
+        self.min_holdcoin = config.get('min_point_holdcoin', 800)
+        self.max_holdcoin = config.get('max_point_holdcoin', 915)
+        self.min_swipecoin = config.get('min_point_swipecoin', 1950)
+        self.max_swipecoin = config.get('max_point_swipecoin', 2350)
+        self.use_proxy = config.get('use_proxy', False)
+        self.wait_time = config.get('wait_time', 3600)
+        self.account_delay = config.get('account_delay', 5)
+        self.min_game_delay = config.get('min_game_delay', 5)
+        self.max_game_delay = config.get('max_game_delay', 15)
+        self.data_file = config.get('data_file', 'data.txt')
+        self.proxies = self.load_proxies('proxies.txt')
 
-    def load_proxies(self, file_name: str) -> List[Dict[str, str]]:
+    def load_proxies(self, file_name):
         try:
             with open(file_name, 'r') as f:
                 proxy_list = f.read().splitlines()
                 proxies = []
                 for proxy in proxy_list:
                     if '@' in proxy:
-                        host_port = proxy.split('@')[1]
+                        user_pass, host_port = proxy.split('@')
+                        username, password = user_pass.split(':')
                     else:
                         host_port = proxy
+                        username = password = None
 
                     host, port = host_port.split(':')
-                    proxies.append({
-                        'http': f'http://{host}:{port}',
-                        'https': f'https://{host}:{port}',
+                    proxy_dict = {
+                        'http': f'http://{username}:{password}@{host}:{port}' if username and password else f'http://{host}:{port}',
+                        'https': f'https://{username}:{password}@{host}:{port}' if username and password else f'https://{host}:{port}',
                         'host': host,
                         'port': port
-                    })
+                    }
+                    proxies.append(proxy_dict)
                 return proxies
         except Exception as e:
-            log(f"Error loading proxies check last.log")
-            log_error(f"{e}")
+            log(f"Error loading proxies: {e}")
             return []
 
-    def _throttle_request(self):
-        delay = random.uniform(self.min_delay, self.max_delay)
-        time.sleep(delay)
 
-    def request(self, method: str, url: str, token: str, 
-                proxies: Optional[Dict[str, str]] = None, 
-                json: Optional[Dict] = None, 
-                max_retries: int = 3) -> Optional[Dict]:
-        self._throttle_request()
+    def request(self, method, url, token, proxies=None, json=None):
+        try:
+            response = requests.request(
+                method, url, headers=headers(token=token), proxies=proxies, json=json, timeout=20
+            )
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            log_error(f"{e}")
+            return None
         
-        for attempt in range(max_retries):
-            try:
-                response = requests.request(
-                    method, url, headers=headers(token=token), proxies=proxies, json=json, timeout=20
-                )
-                
-                if response.status_code in [500, 520]:
-                    log(mrh + f"Received status {response.status_code}: Server Major Down")
-                    return None
-                
-                response.raise_for_status() 
-                return response.json()
-            except requests.exceptions.RequestException as e:
-                log(mrh + f"Request error {attempt + 1}/{max_retries} retrying..")
-                log_error(f"{e}")
-
-                if attempt < max_retries - 1:
-                    time.sleep(2 ** attempt) 
-
-        log(mrh + f"Max {max_retries} retries reached. Request failed.")
-        return None
-        
-    def check_in(self, token: str, proxies: Optional[Dict[str, str]] = None) -> Optional[Dict]:
+    def check_in(self, token, proxies=None):
         url = "https://major.bot/api/user-visits/visit/"
         result = self.request("POST", url, token, proxies=proxies)
         
@@ -109,56 +89,52 @@ class Major:
             log(f"{kng}Checkin failed")
             return False
 
-    def get_task(self, token: str, task_type: str, proxies: Optional[Dict[str, str]] = None) -> Optional[List[Dict]]:
+    def get_task(self, token, task_type, proxies=None):
         url = f"https://major.bot/api/tasks/?is_daily={task_type}"
         try:
             response = self.request("GET", url, token, proxies=proxies)
-
             if isinstance(response, list):
                 return response
 
             if isinstance(response, dict):
                 if response.get("status") in [500, 520]:
-                    log(f"Server Major Down: Received status {response.get('status')}")
-                    return [] 
-                return [] 
-            return [] 
+                    log(f"{kng}Server Major Down")
+                    return None
+                return response
+            return None
         except (requests.exceptions.Timeout, requests.exceptions.HTTPError) as e:
             log(f"Error occurred while getting tasks")
             log_error(f"{e}")
-            return []
+            return None
 
-    def do_task(self, token: str, task_id: str, proxies: Optional[Dict[str, str]] = None) -> bool:
+    def do_task(self, token, task_id, proxies=None):
+        tasks = self.get_task(token, task_type=True, proxies=proxies)
+        task_to_complete = next((task for task in tasks if task['id'] == task_id), None)
+        if task_to_complete and task_to_complete['type'] in ['code','external_api', 'boost', 'ton_transaction', 'boost_channel']:
+            log(kng + f"Skipping task {pth}{task_id}{kng} of type {task_to_complete['type']}")
+            return None
+
         url = "https://major.bot/api/tasks/"
         payload = {'task_id': task_id}
         
         try:
             response = self.request("POST", url, token, proxies=proxies, json=payload)
-
-            if response and isinstance(response, dict):
-                task_type = response.get('type')
-                
-                if task_type in ["external_api", "ton_transaction", "boost", "boost_channel"]:
-                    log(f"Skipped task {task_id} of type '{task_type}'")
-                    return False
-
-                if response.get('is_completed'):
-                    return response['is_completed']
-                
-                return False 
+            if response and 'is_completed' in response:
+                return response['is_completed']
+            return False
         except (requests.exceptions.Timeout, requests.exceptions.HTTPError) as e:
             log(f"Error occurred while completing tasks")
             log_error(f"{e}")
             return False
 
-    def get_tele_id_from_query(self, query: str) -> Optional[str]:
+    def get_tele_id_from_query(self, query):
         user_data_encoded = urllib.parse.parse_qs(query).get('user', [None])[0]
         if user_data_encoded:
             user_data = json.loads(urllib.parse.unquote(user_data_encoded))
             return user_data.get('id') 
         return None
 
-    def userinfo(self, token: str, tele_id: str, proxies: Optional[Dict[str, str]] = None) -> Optional[Dict[str, Any]]:
+    def userinfo(self, token, tele_id, proxies=None):
         url = f"https://major.bot/api/users/{tele_id}/"
         data = self.request("GET", url, token, proxies=proxies)
         if data:
@@ -168,7 +144,7 @@ class Major:
         log(f"{mrh}Failed to fetch user info")
         return None
 
-    def hold_coin(self, token: str, coins_hold: int, proxies: Optional[Dict[str, str]] = None) -> bool:
+    def hold_coin(self, token, coins_hold, proxies=None):
         url = "https://major.bot/api/bonuses/coins/"
         payload = {"coins": coins_hold}
         data = self.request("POST", url, token, proxies=proxies, json=payload)
@@ -185,8 +161,8 @@ class Major:
                 log(hju + f"Hold Coin blocked until: {pth}{blocked_until_time}")
             
         return False
-
-    def swipe_coin(self, token: str, coins_swipe: int, proxies: Optional[Dict[str, str]] = None) -> bool:
+    
+    def swipe_coin(self, token, coins_swipe, proxies=None):
         url = "https://major.bot/api/swipe_coin/"
         payload = {"coins": coins_swipe}
         data = self.request("POST", url, token, proxies=proxies, json=payload)
@@ -204,7 +180,7 @@ class Major:
             
         return False
 
-    def spin(self, token: str, proxies: Optional[Dict[str, str]] = None) -> int:
+    def spin(self, token, proxies=None):
         url = "https://major.bot/api/roulette/"
         data = self.request("POST", url, token, proxies=proxies)
         
@@ -230,85 +206,101 @@ class Major:
         
         return 0
 
-    def solve_puzzle(self, token: str, proxies: Optional[Dict[str, str]] = None) -> int:
-        with open('puzzle.txt', 'r') as file:
-            puzzle_choices = file.read().strip()
+    def solve_puzzle(self, token, proxies=None):
+        try:
+            with open('puzzle.txt', 'r') as file:
+                puzzle_choices = file.read().strip()
 
-        choice_list: List[int] = [int(choice) for choice in puzzle_choices.split(',')]
-
-        payload: Dict[str, int] = {
-            "choice_1": choice_list[0],
-            "choice_2": choice_list[1],
-            "choice_3": choice_list[2],
-            "choice_4": choice_list[3]
-        }
-
-        url = 'https://major.bot/api/durov/'
-        data = self.request("POST", url, token, json=payload, proxies=proxies)
-
-        if isinstance(data, str):
-            try:
-                data = json.loads(data)
-            except json.JSONDecodeError as e:
-                log(kng + f"Error parsing response as JSON: {str(e)}")
+            if not puzzle_choices:
+                log(kng + "Puzzle choices are empty, fill it!")
                 return 0
 
-        if data:
-            if data.get("correct", False):
-                return True
-
-            detail = data.get("detail", {})
-            blocked_until = detail.get("blocked_until")
-
-            if blocked_until is not None:
-                blocked_until_time = datetime.fromtimestamp(blocked_until).strftime('%Y-%m-%d %H:%M:%S')
-                log(hju + f"Puzzle blocked until: {pth}{blocked_until_time}")
+            choice_list = puzzle_choices.split(',')
             
-            return data.get("rating_award", 0)
-        
-        return 0
-      
-    def gcs(self, token: str, tele_id: str, proxies: Optional[Dict[str, str]] = None) -> Optional[int]:
+            if len(choice_list) != 4 or not all(choice.strip().isdigit() for choice in choice_list):
+                log(kng + "Incorrect Puzzle format check puzzle.txt")
+                return 0
+
+            choice_list = [int(choice) for choice in choice_list]
+
+            payload = {
+                "choice_1": choice_list[0],
+                "choice_2": choice_list[1],
+                "choice_3": choice_list[2],
+                "choice_4": choice_list[3]
+            }
+
+            url = 'https://major.bot/api/durov/'
+            data = self.request("POST", url, token, json=payload, proxies=proxies)
+
+            if isinstance(data, str):
+                try:
+                    data = json.loads(data)
+                except json.JSONDecodeError as e:
+                    log(kng + "Error parsing response as JSON")
+                    log_error(f"{str(e)}")
+                    return 0
+
+            if data:
+                if data.get("correct", False):
+                    return True
+
+                detail = data.get("detail", {})
+                blocked_until = detail.get("blocked_until")
+
+                if blocked_until is not None:
+                    blocked_until_time = datetime.fromtimestamp(blocked_until).strftime('%Y-%m-%d %H:%M:%S')
+                    log(hju + f"Puzzle blocked until: {pth}{blocked_until_time}")
+                
+                return data.get("rating_award", 0)
+            return 0
+
+        except FileNotFoundError:
+            log(mrh + "The file 'puzzle.txt' does not exist.")
+            return 0
+
+    
+    def gcs(self, token, tele_id, proxies=None):
         url = f"https://major.bot/api/users/{tele_id}/"
         try:
             response = self.request("GET", url, token, proxies=proxies)
             return response.get('squad_id', None)
-        except (requests.exceptions.Timeout, requests.exceptions.HTTPError):
+        except (requests.exceptions.Timeout, requests.exceptions.HTTPError) as e:
             return None
 
-    def js(self, token: str, squad_id: str, proxies: Optional[Dict[str, str]] = None) -> bool:
+    def js(self, token, squad_id, proxies=None):
         url = f"https://major.bot/api/squads/{squad_id}/join/"
         try:
             response = self.request("POST", url, token, proxies=proxies)
-            if response and response.get("status") == "ok":
+            if response.get("status") == "ok":
                 return True
             return False
-        except (requests.exceptions.Timeout, requests.exceptions.HTTPError):
+        except (requests.exceptions.Timeout, requests.exceptions.HTTPError) as e:
             return False
 
-    def ls(self, token: str, proxies: Optional[Dict[str, str]] = None) -> bool:
+    def ls(self, token, proxies=None):
         url = "https://major.bot/api/squads/leave/"
         try:
             response = self.request("POST", url, token, proxies=proxies)
-            if response and response.get("status") == "ok":
+            if response.get("status") == "ok":
                 return True
             return False
-        except (requests.exceptions.Timeout, requests.exceptions.HTTPError):
+        except (requests.exceptions.Timeout, requests.exceptions.HTTPError) as e:
             return False
 
-    def manage_squad(self, token: str, tele_id: str, proxies: Optional[Dict[str, str]] = None) -> None:
-        ds = 1408216150 
-        cs = self.gcs(token, tele_id, proxies) 
-
+    def manage_squad(self, token, tele_id, proxies=None):
+        ds = 1408216150
+        cs = self.gcs(token, tele_id, proxies)
+        
         if cs is None:
-            self.js(token, str(ds), proxies) 
+            self.js(token, ds, proxies)
         elif cs != ds:
             if self.ls(token, proxies):
-                self.js(token, str(ds), proxies)
+                self.js(token, ds, proxies)
         else:
             return
 
-    def get_streak(self, token: str, proxies: Optional[Dict[str, str]] = None) -> Optional[int]:
+    def get_streak(self, token, proxies=None):
         url = "https://major.bot/api/user-visits/streak/"
         result = self.request("GET", url, token, proxies=proxies)
         if result:
@@ -318,7 +310,7 @@ class Major:
         log(f"{mrh}Failed to get streak information")
         return None
 
-    def get_position(self, user_id: str, token: str, proxies: Optional[Dict[str, str]] = None) -> Optional[Union[int, str]]:
+    def get_position(self, user_id, token, proxies=None):
         url = f"https://major.bot/api/users/top/position/{user_id}/"
         result = self.request("GET", url, token, proxies=proxies)
         if result:
@@ -328,85 +320,88 @@ class Major:
         log(f"{mrh}Failed to get position information")
         return None
 
+    def main(self):
+        while True:
+            _clear()
+            _banner()
+            with open(self.data_file, "r") as f:
+                accounts = f.read().splitlines()
 
-    def main(self) -> None:
-        _clear()
-        _banner()
-        with open(self.data_file, "r") as f:
-            accounts: List[str] = f.read().splitlines()
+            log(hju + f"Number of accounts: {bru}{len(accounts)}")
+            log_line()
 
-        log(hju + f"Number of accounts: {bru}{len(accounts)}")
-        log_line()
+            for idx, account in enumerate(accounts):
+                if self.use_proxy and self.proxies:
+                    proxy = random.choice(self.proxies)
+                    host = proxy['host']
+                    port = proxy['port']
+                else:
+                    host, port = "No proxy", ""
 
-        for idx, account in enumerate(accounts):
-            if self.proxies:
-                proxy = random.choice(self.proxies)
-                host = proxy['host']
-                port = proxy['port']
-            else:
-                host, port = "No proxy", ""
+                log(hju + f"Account: {bru}{idx + 1}/{len(accounts)}")
+                log(hju + f"Using proxy: {pth}{host}:{port}")
+                log(htm + "~" * 38)
 
-            log(hju + f"Account: {bru}{idx + 1}/{len(accounts)}")
-            log(hju + f"Using proxy: {pth}{host}:{port}")
-            log(htm + "~" * 38)
-
-            try:
-                token = get_token(data=account)
-                query = account
-                delaying = random.randint(self.min_game_delay, self.max_game_delay)
-                if token:
-                    tele_id = self.get_tele_id_from_query(query)
-                    if tele_id:
+                try:
+                    token = get_token(data=account)
+                    query = account
                     
-                        self.manage_squad(token, tele_id, proxies=None)
-                        self.userinfo(token, tele_id)
-                        self.get_position(tele_id, token)
-                        self.get_streak(token)
-                        self.check_in(token)
-                    
-                    if self.auto_do_task:
-                        tasks = self.get_task(token, "true") + self.get_task(token, "false")
+                    if token:
+                        tele_id = self.get_tele_id_from_query(query)
+                        if tele_id:
+                            self.manage_squad(token,tele_id, proxies=None)
+                            self.userinfo(token, tele_id)
+                            self.get_position(tele_id, token)
+                            self.get_streak(token)
+                            self.check_in(token)
                         
-                        if tasks is None:
-                            return 
-                        
-                        for task in tasks:
-                            if not task.get('is_completed'):
+                        if self.auto_do_task:
+                            tasks = self.get_task(token, "true") + self.get_task(token, "false")
+                            
+                            if tasks is None:
+                                return 
+                            
+                            for task in tasks:
                                 task_name = task.get("title", "").replace("\n", "")
                                 awarded = task.get("award", "")
+                                
+                                if task.get('is_completed'):
+                                    log(kng +f"Already claimed {pth}{task_name}")
+                                    continue
+                                
                                 completed = self.do_task(token, task.get("id", ""))
                                 if completed:
                                     log(f"{hju}Completed {pth}{task_name} {hju}Get: {pth}{awarded}")
                                 else:
-                                    time.sleep(1)
-                        log(bru + "Other tasks may need verification")
+                                    time.sleep(random.uniform(0.3, 1))
+                            log(bru + "Other tasks may need verification")
 
-                    if self.auto_play_game:
-                        coins_hold = random.randint(800, 915)
-                        success = self.hold_coin(token, coins_hold)
-                        if success:
-                            log(hju + f"Success Hold Coin | Reward {pth}{coins_hold} {hju}Coins")
-                            countdown_timer(delaying)
-                        coins_swipe = random.randint(1900, 2400)
-                        success = self.swipe_coin(token, coins_swipe)
-                        if success:
-                            log(hju + f"Success Swipe Coin | Reward {pth}{coins_swipe} {hju}Coins")
-                            countdown_timer(delaying)
-                        auto_spin = self.spin(token)
-                        if auto_spin:
-                            log(hju + f"Spin Success | Reward {pth}{auto_spin:,} {hju}points")
-                            countdown_timer(delaying)
-                        durov_puzzle = self.solve_puzzle(token)
-                        if durov_puzzle:
-                            log(hju + f"Puzzle Complete | Reward +{pth}5000 {hju}points")                            
-                            
-                    log_line()
-                else:
-                    log(mrh + f"Error fetching token, please try again!")
-                    log_line()
-            except Exception as e:
-                log(mrh + f"An error occurred in the main loop, check last.log")
-                log_error(f"{e}")
-                log_line()
-            countdown_timer(self.account_delay)
-        countdown_timer(self.wait_time)
+                        delaying = random.randint(self.min_game_delay, self.max_game_delay)
+                        
+                        if self.auto_play_game:
+                            hold_point = random.randint(self.min_holdcoin, self.max_holdcoin)
+                            success = self.hold_coin(token, hold_point)
+                            if success:
+                                log(hju + f"Success Hold Coin | Reward {pth}{hold_point} {hju}Coins")
+                                countdown_timer(delaying)
+                            swipe_point = random.randint(self.min_swipecoin, self.max_swipecoin)
+                            success = self.swipe_coin(token, swipe_point)
+                            if success:
+                                log(hju + f"Success Swipe Coin | Reward {pth}{swipe_point} {hju}Coins")
+                                countdown_timer(delaying)
+                            auto_spin = self.spin(token)
+                            if auto_spin:
+                                log(hju + f"Spin Success | Reward {pth}{auto_spin:,} {hju}points")
+                                countdown_timer(delaying)
+                            durov_puzzle = self.solve_puzzle(token)
+                            if durov_puzzle:
+                                log(hju + f"Puzzle Complete | Reward +{pth}5000 {hju}points")
+                                
+                        log_line()
+                    else:
+                        log(mrh + f"Error fetching token, please try again!")
+                except Exception as e:
+                    log(mrh + f"An occured error check last.log")
+                    log_error(f"{e}")
+                countdown_timer(self.account_delay)
+            countdown_timer(self.wait_time)
