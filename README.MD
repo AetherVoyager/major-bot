@@ -20,8 +20,9 @@ To use this bot, you need to register it with the Major Telegram Bot.
 3. Install This Major Telegram Bot
 4. Have Fun 🦈
 
-## Update 2024/09/29&30
+## Update 2024/10/2
 
+- :V
 - **Downgrade** : back to using the previous version of the major
 - **Fix** : fix the bug that crash bot when check-in holding, spinning & retrieving user information.
 - **Adding** : speed up task checking by skipping tasks that need to be verified.
