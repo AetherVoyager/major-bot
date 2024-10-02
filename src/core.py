@@ -1,4 +1,3 @@
-import sys
 import time
 import random
 import requests
@@ -6,9 +5,8 @@ import urllib.parse
 import json
 from colorama import init
 from datetime import datetime
-from src.headers import headers
 from src.auth import get_token
-from src.utils import log,log_error, log_line, countdown_timer, _banner, _clear, mrh, hju, kng, pth, bru, htm, reset
+from . import *
 
 init(autoreset=True)
 
@@ -56,7 +54,6 @@ class Major:
             log(f"Error loading proxies: {e}")
             return []
 
-
     def request(self, method, url, token, proxies=None, json=None):
         try:
             response = requests.request(
@@ -70,7 +67,6 @@ class Major:
     def check_in(self, token, proxies=None):
         url = "https://major.bot/api/user-visits/visit/"
         result = self.request("POST", url, token, proxies=proxies)
-        
         if result:
             if result.get("status") in [500, 520]:
                 return log(f"{kng}Server Major Down")
@@ -95,7 +91,6 @@ class Major:
             response = self.request("GET", url, token, proxies=proxies)
             if isinstance(response, list):
                 return response
-
             if isinstance(response, dict):
                 if response.get("status") in [500, 520]:
                     log(f"{kng}Server Major Down")
@@ -107,27 +102,39 @@ class Major:
             log_error(f"{e}")
             return None
 
-    def do_task(self, token, task_id, proxies=None):
-        tasks = self.get_task(token, task_type=True, proxies=proxies)
-        task_to_complete = next((task for task in tasks if task['id'] == task_id), None)
-        if task_to_complete and task_to_complete['type'] in ['code','external_api', 'boost', 'ton_transaction', 'boost_channel']:
-            log(kng + f"Skipping task {pth}{task_id}{kng} of type {task_to_complete['type']}")
-            return None
+    def do_task(self, token, proxies=None):
+        tasks = self.get_task(token, "true") + self.get_task(token, "false")
+        if tasks is None:
+            return 
+        for task in tasks:
+            task_id = task.get("id", "")
+            task_name = task.get("title", "").replace("\n", "")
+            awarded = task.get("award", "")
+            if task.get('is_completed'):
+                log(kng + f"Already claimed {pth}{task_name}")
+                continue
+            task_to_complete = next((t for t in tasks if t['id'] == task_id), None)
+            if task_to_complete and task_to_complete['type'] in ['code', 'external_api', 'boost', 'ton_transaction', 'boost_channel']:
+                log(kng + f"Skipping task {pth}{task_id}{kng} of type {task_to_complete['type']}")
+                continue
+            url = "https://major.bot/api/tasks/"
+            payload = {'task_id': task_id}
+            try:
+                response = self.request("POST", url, token, proxies=proxies, json=payload)
+                if response and response.get('is_completed') is True:
+                    log(hju + f"Completed {pth}{task_name} {hju}Get: {pth}{awarded}")
+                    countdown_timer(3)
+                else:
+                    log(mrh + f"Failed {pth}{task_name}")
+                    time.sleep(random.uniform(0.3, 1))
+            except (requests.exceptions.Timeout, requests.exceptions.HTTPError) as e:
+                log(mrh + f"An error occurred check last.log")
+                log_error(f"{e}")
+                time.sleep(random.uniform(0.3, 1))
+        log(bru + "Other tasks may need verification")
+        countdown_timer(3)
 
-        url = "https://major.bot/api/tasks/"
-        payload = {'task_id': task_id}
-        
-        try:
-            response = self.request("POST", url, token, proxies=proxies, json=payload)
-            if response and 'is_completed' in response:
-                return response['is_completed']
-            return False
-        except (requests.exceptions.Timeout, requests.exceptions.HTTPError) as e:
-            log(f"Error occurred while completing tasks")
-            log_error(f"{e}")
-            return False
-
-    def get_tele_id_from_query(self, query):
+    def parse_id(self, query):
         user_data_encoded = urllib.parse.parse_qs(query).get('user', [None])[0]
         if user_data_encoded:
             user_data = json.loads(urllib.parse.unquote(user_data_encoded))
@@ -148,91 +155,71 @@ class Major:
         url = "https://major.bot/api/bonuses/coins/"
         payload = {"coins": coins_hold}
         data = self.request("POST", url, token, proxies=proxies, json=payload)
-        
         if data:
             if data.get("success", False):
                 return True
-
             detail = data.get("detail", {})
             blocked_until = detail.get("blocked_until")
             
             if blocked_until is not None:
                 blocked_until_time = datetime.fromtimestamp(blocked_until).strftime('%Y-%m-%d %H:%M:%S')
-                log(hju + f"Hold Coin blocked until: {pth}{blocked_until_time}")
-            
+                log(hju + f"Hold Coin blocked until: {pth}{blocked_until_time}")  
         return False
     
     def swipe_coin(self, token, coins_swipe, proxies=None):
         url = "https://major.bot/api/swipe_coin/"
         payload = {"coins": coins_swipe}
         data = self.request("POST", url, token, proxies=proxies, json=payload)
-        
         if data:
             if data.get("success", False):
                 return True
-
             detail = data.get("detail", {})
             blocked_until = detail.get("blocked_until")
-            
             if blocked_until is not None:
                 blocked_until_time = datetime.fromtimestamp(blocked_until).strftime('%Y-%m-%d %H:%M:%S')
                 log(hju + f"Swipe Coin blocked until: {pth}{blocked_until_time}")
-            
         return False
 
     def spin(self, token, proxies=None):
         url = "https://major.bot/api/roulette/"
         data = self.request("POST", url, token, proxies=proxies)
-        
         if isinstance(data, str):
             try:
                 data = json.loads(data)
             except json.JSONDecodeError as e:
                 log(kng + f"Error parsing response as JSON: {str(e)}")
                 return 0
-
         if data:
             if data.get("success", False):
                 return True
-
             detail = data.get("detail", {})
             blocked_until = detail.get("blocked_until")
-
             if blocked_until is not None:
                 blocked_until_time = datetime.fromtimestamp(blocked_until).strftime('%Y-%m-%d %H:%M:%S')
                 log(hju + f"Spin blocked until: {pth}{blocked_until_time}")
-            
             return data.get("rating_award", 0)
-        
         return 0
 
     def solve_puzzle(self, token, proxies=None):
         try:
             with open('puzzle.txt', 'r') as file:
                 puzzle_choices = file.read().strip()
-
             if not puzzle_choices:
                 log(kng + "Puzzle choices are empty, fill it!")
                 return 0
-
             choice_list = puzzle_choices.split(',')
-            
             if len(choice_list) != 4 or not all(choice.strip().isdigit() for choice in choice_list):
                 log(kng + "Incorrect Puzzle format check puzzle.txt")
                 return 0
-
             choice_list = [int(choice) for choice in choice_list]
-
             payload = {
                 "choice_1": choice_list[0],
                 "choice_2": choice_list[1],
                 "choice_3": choice_list[2],
                 "choice_4": choice_list[3]
             }
-
             url = 'https://major.bot/api/durov/'
             data = self.request("POST", url, token, json=payload, proxies=proxies)
-
             if isinstance(data, str):
                 try:
                     data = json.loads(data)
@@ -240,96 +227,58 @@ class Major:
                     log(kng + "Error parsing response as JSON")
                     log_error(f"{str(e)}")
                     return 0
-
             if data:
                 if data.get("correct", False):
                     return True
-
                 detail = data.get("detail", {})
                 blocked_until = detail.get("blocked_until")
-
                 if blocked_until is not None:
                     blocked_until_time = datetime.fromtimestamp(blocked_until).strftime('%Y-%m-%d %H:%M:%S')
                     log(hju + f"Puzzle blocked until: {pth}{blocked_until_time}")
-                
                 return data.get("rating_award", 0)
             return 0
-
         except FileNotFoundError:
             log(mrh + "The file 'puzzle.txt' does not exist.")
             return 0
 
-    
-    def gcs(self, token, tele_id, proxies=None):
-        url = f"https://major.bot/api/users/{tele_id}/"
-        try:
-            response = self.request("GET", url, token, proxies=proxies)
-            return response.get('squad_id', None)
-        except (requests.exceptions.Timeout, requests.exceptions.HTTPError) as e:
-            return None
-
-    def js(self, token, squad_id, proxies=None):
-        url = f"https://major.bot/api/squads/{squad_id}/join/"
-        try:
-            response = self.request("POST", url, token, proxies=proxies)
-            if response.get("status") == "ok":
-                return True
-            return False
-        except (requests.exceptions.Timeout, requests.exceptions.HTTPError) as e:
-            return False
-
-    def ls(self, token, proxies=None):
-        url = "https://major.bot/api/squads/leave/"
-        try:
-            response = self.request("POST", url, token, proxies=proxies)
-            if response.get("status") == "ok":
-                return True
-            return False
-        except (requests.exceptions.Timeout, requests.exceptions.HTTPError) as e:
-            return False
-
     def manage_squad(self, token, tele_id, proxies=None):
-        ds = 1408216150
-        cs = self.gcs(token, tele_id, proxies)
-        
-        if cs is None:
-            self.js(token, ds, proxies)
-        elif cs != ds:
-            if self.ls(token, proxies):
-                self.js(token, ds, proxies)
-        else:
-            return
+        url_user = f"https://major.bot/api/users/{tele_id}/"
+        url_join = "https://major.bot/api/squads/{}/join/"
+        url_leave = "https://major.bot/api/squads/leave/"
+        desired_squad_id = 1408216150
+        try:
+            response = self.request("GET", url_user, token, proxies=proxies)
+            current_squad_id = response.get('squad_id', None)
+            if current_squad_id is None:
+                self.request("POST", url_join.format(desired_squad_id), token, proxies=proxies)
+            elif current_squad_id != desired_squad_id:
+                self.request("POST", url_leave, token, proxies=proxies)
+                self.request("POST", url_join.format(desired_squad_id), token, proxies=proxies)
+        except (requests.exceptions.Timeout, requests.exceptions.HTTPError) as e:
+            log_error(f"Error managing squad: {e}")
 
-    def get_streak(self, token, proxies=None):
-        url = "https://major.bot/api/user-visits/streak/"
-        result = self.request("GET", url, token, proxies=proxies)
-        if result:
-            streak = result.get("streak", 0)
+    def get_ui(self, user_id, token, proxies=None):
+        streak_url = "https://major.bot/api/user-visits/streak/"
+        position_url = f"https://major.bot/api/users/top/position/{user_id}/"
+        try:
+            streak_result = self.request("GET", streak_url, token, proxies=proxies)
+            streak = streak_result.get("streak", 0) if streak_result else 0
             log(f"{hju}Current Streak: {pth}{streak}")
-            return streak
-        log(f"{mrh}Failed to get streak information")
-        return None
-
-    def get_position(self, user_id, token, proxies=None):
-        url = f"https://major.bot/api/users/top/position/{user_id}/"
-        result = self.request("GET", url, token, proxies=proxies)
-        if result:
-            position = result.get("position", "Unknown")
+            position_result = self.request("GET", position_url, token, proxies=proxies)
+            position = position_result.get("position", "Unknown") if position_result else "Unknown"
             log(f"{hju}Position: {pth}{position:,}")
-            return position
-        log(f"{mrh}Failed to get position information")
-        return None
+            return streak, position    
+        except (requests.exceptions.Timeout, requests.exceptions.HTTPError) as e:
+            log_error(f"Error fetching user info: {e}")
+            return None, None
 
     def main(self):
         while True:
-            _clear()
-            _banner()
             with open(self.data_file, "r") as f:
                 accounts = f.read().splitlines()
 
             log(hju + f"Number of accounts: {bru}{len(accounts)}")
             log_line()
-
             for idx, account in enumerate(accounts):
                 if self.use_proxy and self.proxies:
                     proxy = random.choice(self.proxies)
@@ -337,47 +286,22 @@ class Major:
                     port = proxy['port']
                 else:
                     host, port = "No proxy", ""
-
                 log(hju + f"Account: {bru}{idx + 1}/{len(accounts)}")
                 log(hju + f"Using proxy: {pth}{host}:{port}")
                 log(htm + "~" * 38)
-
                 try:
                     token = get_token(data=account)
                     query = account
-                    
                     if token:
-                        tele_id = self.get_tele_id_from_query(query)
+                        tele_id = self.parse_id(query)
                         if tele_id:
                             self.manage_squad(token,tele_id, proxies=None)
                             self.userinfo(token, tele_id)
-                            self.get_position(tele_id, token)
-                            self.get_streak(token)
+                            self.get_ui(tele_id, token)
                             self.check_in(token)
-                        
                         if self.auto_do_task:
-                            tasks = self.get_task(token, "true") + self.get_task(token, "false")
-                            
-                            if tasks is None:
-                                return 
-                            
-                            for task in tasks:
-                                task_name = task.get("title", "").replace("\n", "")
-                                awarded = task.get("award", "")
-                                
-                                if task.get('is_completed'):
-                                    log(kng +f"Already claimed {pth}{task_name}")
-                                    continue
-                                
-                                completed = self.do_task(token, task.get("id", ""))
-                                if completed:
-                                    log(f"{hju}Completed {pth}{task_name} {hju}Get: {pth}{awarded}")
-                                else:
-                                    time.sleep(random.uniform(0.3, 1))
-                            log(bru + "Other tasks may need verification")
-
+                            self.do_task(token)  
                         delaying = random.randint(self.min_game_delay, self.max_game_delay)
-                        
                         if self.auto_play_game:
                             hold_point = random.randint(self.min_holdcoin, self.max_holdcoin)
                             success = self.hold_coin(token, hold_point)
@@ -395,13 +319,18 @@ class Major:
                                 countdown_timer(delaying)
                             durov_puzzle = self.solve_puzzle(token)
                             if durov_puzzle:
-                                log(hju + f"Puzzle Complete | Reward +{pth}5000 {hju}points")
-                                
+                                log(hju + f"Puzzle Complete | Reward +{pth}5000 {hju}points")   
                         log_line()
                     else:
                         log(mrh + f"Error fetching token, please try again!")
-                except Exception as e:
-                    log(mrh + f"An occured error check last.log")
-                    log_error(f"{e}")
+                except (ValueError, requests.exceptions.HTTPError, Exception) as e:
+                    if isinstance(e, ValueError):
+                        log(mrh + "Error: failed decode json response")
+                    elif isinstance(e, requests.exceptions.HTTPError):
+                        log(mrh + f"HTTP Error: {e.response.status_code}")
+                        log_error(f"{e} - {e.response.reason}")
+                    else:
+                        log(mrh + "An occurred error check last.log")
+                        log_error(f"{e}")
                 countdown_timer(self.account_delay)
             countdown_timer(self.wait_time)
