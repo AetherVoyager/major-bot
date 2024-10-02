@@ -18,11 +18,7 @@ def get_token(data, proxies=None):
         else:
             log(mrh + "Token not found in response data.")
             return None
-    except requests.exceptions.RequestException as e:
-        log(mrh + f"Request failed: check last.log for detail.")
-        log_error(f"{e}")
-        return None
-    except ValueError as e:
-        log(mrh + f"JSON decoding failed: check last.log for detail.")
+    except (requests.exceptions.RequestException, ValueError) as e:
+        log(mrh + "Request or JSON decoding failed: check last.log")
         log_error(f"{e}")
         return None
