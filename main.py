@@ -1,8 +1,9 @@
 import sys
-from src.core import Major
-from src.utils import mrh, log
+from src.__init__ import *
 
 if __name__ == "__main__":
+    clear()
+    banner()
     while True:
         try:
             major = Major()
