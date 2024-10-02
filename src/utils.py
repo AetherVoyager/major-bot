@@ -14,7 +14,7 @@ htm = Fore.LIGHTBLACK_EX
 
 last_log_message = None
 
-def _banner():
+def banner():
     banner = r"""
  ██╗████████╗███████╗     ██╗ █████╗ ██╗    ██╗
  ██║╚══██╔══╝██╔════╝     ██║██╔══██╗██║    ██║
@@ -28,7 +28,7 @@ def _banner():
     print(mrh + f" before start please '{hju}git pull{mrh}' to update bot")
     log_line()
 
-def _clear():
+def clear():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def read_config():
