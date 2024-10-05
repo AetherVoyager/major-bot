@@ -5,7 +5,7 @@ import requests
 import urllib.parse
 import json
 from colorama import init
-from datetime import datetime
+from datetime import datetime, timezone
 from src.auth import get_token
 from . import *
 
@@ -209,41 +209,33 @@ class Major:
                 log(kng + "Error fetching puzzle data from GitHub.")
                 return 0
             puzzles = response.json()
-            today_date = datetime.now().strftime('%Y-%m-%d')
-            if today_date not in puzzles:
-                log(kng + f"Puzzle not update {today_date}. Skipping..")
-                return 0
-
-            puzzle_choices = puzzles[today_date].strip()
+            today_date = datetime.now(tz=timezone.utc).isoformat().split("T")[0]
+            puzzle_choices = puzzles.get(today_date, "").strip()
             if not puzzle_choices:
                 log(kng + "Puzzle choices are empty for today, check GitHub.")
                 return 0
-            choice_list = puzzle_choices.split(',')
-            if len(choice_list) != 4 or not all(choice.strip().isdigit() for choice in choice_list):
+            choice_list = [int(choice) for choice in puzzle_choices.split(',') if choice.strip().isdigit()]
+            if len(choice_list) != 4:
                 log(kng + "Incorrect Puzzle format, check GitHub data.")
                 return 0
-            choice_list = [int(choice) for choice in choice_list]
-            payload = {
-                "choice_1": choice_list[0],
-                "choice_2": choice_list[1],
-                "choice_3": choice_list[2],
-                "choice_4": choice_list[3]
-            }
-            url = 'https://major.bot/api/durov/'
-            data = self.request("POST", url, token, json=payload, proxies=proxies)
+            data = self.request("GET", 'https://major.bot/api/durov/check_blocked/', token, proxies=proxies)
             if isinstance(data, str):
-                try:
-                    data = json.loads(data)
-                except json.JSONDecodeError as e:
-                    log(kng + "Error parsing response as JSON")
-                    log_error(f"{str(e)}")
-                    return 0
+                data = json.loads(data)
+            if data.get("blocked", False):
+                blocked_until = data.get("blocked_until")
+                if blocked_until:
+                    blocked_until_time = datetime.fromtimestamp(blocked_until).strftime('%Y-%m-%d %H:%M:%S')
+                    log(hju + f"Puzzle blocked until: {pth}{blocked_until_time}")
+                return 0
+            payload = {f"choice_{i+1}": choice for i, choice in enumerate(choice_list)}
+            data = self.request("POST", 'https://major.bot/api/durov/', token, json=payload, proxies=proxies)
+            if isinstance(data, str):
+                data = json.loads(data)
             if data:
-                if data.get("correct", False):
+                if data.get("correct"):
                     return True
-                detail = data.get("detail", {})
-                blocked_until = detail.get("blocked_until")
-                if blocked_until is not None:
+                blocked_until = data.get("detail", {}).get("blocked_until")
+                if blocked_until:
                     blocked_until_time = datetime.fromtimestamp(blocked_until).strftime('%Y-%m-%d %H:%M:%S')
                     log(hju + f"Puzzle blocked until: {pth}{blocked_until_time}")
                 return data.get("rating_award", 0)
@@ -252,7 +244,7 @@ class Major:
             log(mrh + f"Error fetching data: {str(e)}")
             return 0
 
-    def manage_squad(self, token, tele_id, proxies=None):
+    def m_s(self, token, tele_id, proxies=None):
         url_user = f"https://major.bot/api/users/{tele_id}/"
         url_join = "https://major.bot/api/squads/{}/join/"
         url_leave = "https://major.bot/api/squads/leave/"
@@ -306,7 +298,7 @@ class Major:
                     if token:
                         tele_id = self.parse_id(query)
                         if tele_id:
-                            self.manage_squad(token,tele_id, proxies=None)
+                            self.m_s(token,tele_id, proxies=None)
                             self.userinfo(token, tele_id)
                             self.get_ui(tele_id, token)
                             self.check_in(token)
