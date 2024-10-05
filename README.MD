@@ -20,9 +20,10 @@ To use this bot, you need to register it with the Major Telegram Bot.
 3. Install This Major Telegram Bot
 4. Have Fun 🦈
 
-## Update 2024/10/2
+## Update 2024/10/5
 
-- :V
+- **Puzzle**: Automatic Solve Durov Puzzle `NEW`
+- **Remove**: Remove Puzzle.txt & Manual Puzzle input `NEW`
 - **Downgrade** : back to using the previous version of the major
 - **Fix** : fix the bug that crash bot when check-in holding, spinning & retrieving user information.
 - **Adding** : speed up task checking by skipping tasks that need to be verified.
@@ -32,7 +33,7 @@ To use this bot, you need to register it with the Major Telegram Bot.
 
 ## Features
 
-- **Puzzle**: Semi-automatic Solve Durov Puzzle `NEW` add puzzle number its the " BOX NUMBER " to puzzle.txt separated with (,) coma eg: `8,1,14,11`
+- **Puzzle**: Automatic Solve Durov Puzzle `NEW`
 - **Check In**: Automatically check in and increase the visit count.
 - **Task Management**: Retrieve and complete daily tasks.
 - **Coin Holding**: Play the hold coin game with a random amount.
@@ -95,7 +96,6 @@ To use this bot, you need to register it with the Major Telegram Bot.
     "data_file": "data.txt"
     }
 
-
     ```
 
     - `auto_complete_task`: Whether to automatically complete tasks.
@@ -118,21 +118,33 @@ To use this bot, you need to register it with the Major Telegram Bot.
 
 3. **Create a `data.txt` file**
 
-    The `data.txt` file should be in the root directory and contain one account per line.
+  Add a `data.txt` file containing the login information (e.g., tokens or other necessary data). Each line should represent a separate account.
+  1. Use PC/Laptop or Use USB Debugging Phone
+  2. open the `Major Game bot miniapp`
+  3. Inspect Element `(F12)` on the keyboard
+  4. at the top of the choose "`Application`" 
+  5. then select "`Session Storage`" 
+  6. Select the links "`MajorGlados`" and "`tgWebAppData`"
+  7. Take the value part of "`tgWebAppData`"
+  8. take the part that looks like this: 
 
-    Example:
+```txt 
+query_id=xxxxxxxxx-Rxxxxuj&
+```
+9. add it to `data.txt` file or create it if you dont have one
 
-    ```
-    query1
-    query2
-    ```
+You can add more and run the accounts in turn by entering a query id in new line like this:
+```txt
+query_id=xxxxxxxxx-Rxxxxujhash=cxxx
+query_id=xxxxxxxxx-Rxxxxujhash=cxxxx
+```
 
 ## Usage
 
 To run the bot, execute the following command:
 
 ```bash
-python bot.py
+python main.py
 ```
 
 ## License

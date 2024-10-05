@@ -1,3 +1,4 @@
+import sys
 import time
 import random
 import requests
@@ -202,14 +203,24 @@ class Major:
 
     def solve_puzzle(self, token, proxies=None):
         try:
-            with open('puzzle.txt', 'r') as file:
-                puzzle_choices = file.read().strip()
+            url = 'https://raw.githubusercontent.com/jawikas/About/refs/heads/master/major/durovPuzzle.json'
+            response = requests.get(url, proxies=proxies)
+            if response.status_code != 200:
+                log(kng + "Error fetching puzzle data from GitHub.")
+                return 0
+            puzzles = response.json()
+            today_date = datetime.now().strftime('%Y-%m-%d')
+            if today_date not in puzzles:
+                log(kng + f"Puzzle not update {today_date}. Skipping..")
+                return 0
+
+            puzzle_choices = puzzles[today_date].strip()
             if not puzzle_choices:
-                log(kng + "Puzzle choices are empty, fill it!")
+                log(kng + "Puzzle choices are empty for today, check GitHub.")
                 return 0
             choice_list = puzzle_choices.split(',')
             if len(choice_list) != 4 or not all(choice.strip().isdigit() for choice in choice_list):
-                log(kng + "Incorrect Puzzle format check puzzle.txt")
+                log(kng + "Incorrect Puzzle format, check GitHub data.")
                 return 0
             choice_list = [int(choice) for choice in choice_list]
             payload = {
@@ -237,8 +248,8 @@ class Major:
                     log(hju + f"Puzzle blocked until: {pth}{blocked_until_time}")
                 return data.get("rating_award", 0)
             return 0
-        except FileNotFoundError:
-            log(mrh + "The file 'puzzle.txt' does not exist.")
+        except requests.RequestException as e:
+            log(mrh + f"Error fetching data: {str(e)}")
             return 0
 
     def manage_squad(self, token, tele_id, proxies=None):
