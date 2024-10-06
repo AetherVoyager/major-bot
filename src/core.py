@@ -208,11 +208,11 @@ class Major:
             if response.status_code != 200:
                 log(kng + "Error fetching puzzle data from GitHub.")
                 return 0
-            puzzles = response.json()
+            puzzles = response.json()            
             today_date = datetime.now(tz=timezone.utc).isoformat().split("T")[0]
             puzzle_choices = puzzles.get(today_date, "").strip()
             if not puzzle_choices:
-                log(kng + "Puzzle choices are empty for today, check GitHub.")
+                log(kng + "Puzzle choices are empty for today.")
                 return 0
             choice_list = [int(choice) for choice in puzzle_choices.split(',') if choice.strip().isdigit()]
             if len(choice_list) != 4:
@@ -242,6 +242,9 @@ class Major:
             return 0
         except requests.RequestException as e:
             log(mrh + f"Error fetching data: {str(e)}")
+            return 0
+        except ValueError as e:
+            log(mrh + f"JSON decoding error: {str(e)}")
             return 0
 
     def m_s(self, token, tele_id, proxies=None):
